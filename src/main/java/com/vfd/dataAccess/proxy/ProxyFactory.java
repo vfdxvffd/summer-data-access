@@ -155,7 +155,7 @@ public class ProxyFactory {
                 return instance;
             } else {
                 dbUtil.closeAll();
-                throw new Exception("");
+                return null;
             }
         }
     }

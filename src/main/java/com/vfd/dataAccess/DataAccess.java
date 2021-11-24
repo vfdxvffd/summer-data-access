@@ -1,16 +1,18 @@
 package com.vfd.dataAccess;
 
 import com.vfd.dataAccess.annotation.Data;
+import com.vfd.dataAccess.annotation.Transaction;
 import com.vfd.dataAccess.config.Config;
 import com.vfd.dataAccess.proxy.ProxyFactory;
 import com.vfd.summer.applicationContext.impl.SummerAnnotationConfigApplicationContext;
 import com.vfd.summer.extension.Extension;
 import com.vfd.summer.ioc.bean.BeanDefinition;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 
 /**
  * @PackageName: com.vfd.dataAccess
@@ -19,10 +21,11 @@ import java.util.HashSet;
  * @Author: vfdxvffd
  * @date: 2021/11/14 21:55
  */
-public class DataAccess implements Extension {
+public class  DataAccess implements Extension {
     @Override
     public void doOperation0(SummerAnnotationConfigApplicationContext context) throws Exception {
         Config.propertyFile = context.getPropertyFile();
+        context.getNeedBeProxyed().add(Transaction.class);
     }
 
     @Override
@@ -82,5 +85,26 @@ public class DataAccess implements Extension {
     @Override
     public void doOperation9(SummerAnnotationConfigApplicationContext summerAnnotationConfigApplicationContext) throws Exception {
 
+    }
+
+    @Override
+    public void doOperationWhenProxy(SummerAnnotationConfigApplicationContext context, Method methodBeProxy,
+                                     List<Method> before, List<Object> beforeAspect,
+                                     List<Method> after, List<Object> afterAspect,
+                                     List<Method> afterThrowing, List<Object> throwingAspect,
+                                     List<Method> afterReturning, List<Object> returningAspect) throws Exception {
+        Transaction transaction = methodBeProxy.getAnnotation(Transaction.class);
+        if (transaction != null) {
+            Class<SetTransactionMethod> clazz = SetTransactionMethod.class;
+            before.add(clazz.getDeclaredMethod("beforeMethodgetNewConn", Method.class));
+            afterReturning.add(clazz.getDeclaredMethod("returnMethodCommit"));
+            afterThrowing.add(clazz.getDeclaredMethod("throwMethodRollBack"));
+            after.add(clazz.getDeclaredMethod("afterMethodCloseConn"));
+            SetTransactionMethod instance = clazz.newInstance();
+            beforeAspect.add(instance);
+            returningAspect.add(instance);
+            throwingAspect.add(instance);
+            afterAspect.add(instance);
+        }
     }
 }

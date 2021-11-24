@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Stack;
 
 /**
  * @PackageName: com.vfd.dataAccess
@@ -37,8 +38,8 @@ public class DBUtil {
      * @param params sql中占位符代表的参数列表
      * @return 返回绑定完字段的pstmt
      */
-    private PreparedStatement createPreparedStatement(String sql, Object[] params) throws Exception {
-        pstmt = getConnection().prepareStatement(sql);
+    private PreparedStatement createPreparedStatement(Connection connection, String sql, Object[] params) throws Exception {
+        pstmt = connection.prepareStatement(sql);
         if (params != null) {
             for (int i = 1; i <= params.length; i++) {
                 pstmt.setObject(i, params[i - 1]);
@@ -71,14 +72,29 @@ public class DBUtil {
      * @param params 代替?的参数列表，是一个Object数组
      * @return 返回成功与否
      */
-    public int executeUpdate(String sql, Object[] params) throws Exception {
+    private int executeUpdateWithNewConn(String sql, Object[] params) throws Exception {
         int count = -1;
         try {
-            pstmt = createPreparedStatement(sql, params);
+            pstmt = createPreparedStatement(getConnection(), sql, params);
             count = pstmt.executeUpdate();
             return count;
         } finally {
             closeAll();
+        }
+    }
+
+    public int executeUpdate (String sql, Object[] params) throws Exception {
+        int count = -1;
+        long threadId = Thread.currentThread().getId();
+        if (ConnectionControle.threadId2Connections.getOrDefault(threadId, new Stack<>()).isEmpty()) {    // 没有缓存的conn，说明要重新开一个conn
+            return executeUpdateWithNewConn(sql, params);
+        } else {
+            // conn 不关闭
+            Connection conn = ConnectionControle.threadId2Connections.get(threadId).peek();
+            PreparedStatement pstmt = createPreparedStatement(conn, sql, params);
+            count = pstmt.executeUpdate();
+            pstmt.close();
+            return count;
         }
     }
 
@@ -89,8 +105,20 @@ public class DBUtil {
      * @param sql    查的sql语句
      * @param params 参数列表，代替?占位符
      */
-    public void executeQuery(String sql, Object[] params) throws Exception {
-        pstmt = createPreparedStatement(sql, params);
+    public void executeQueryWithNewConn(String sql, Object[] params) throws Exception {
+        pstmt = createPreparedStatement(getConnection(), sql, params);
         rs = pstmt.executeQuery();
+    }
+
+    public void executeQuery(String sql, Object[] params) throws Exception {
+        long threadId = Thread.currentThread().getId();
+        if (ConnectionControle.threadId2Connections.getOrDefault(threadId, new Stack<>()).isEmpty()) {    // 没有缓存的conn，说明要重新开一个conn
+            executeQueryWithNewConn(sql, params);
+        } else {
+            // conn 不关闭
+            Connection conn = ConnectionControle.threadId2Connections.get(threadId).peek();
+            PreparedStatement pstmt = createPreparedStatement(conn, sql, params);
+            rs = pstmt.executeQuery();
+        }
     }
 }
