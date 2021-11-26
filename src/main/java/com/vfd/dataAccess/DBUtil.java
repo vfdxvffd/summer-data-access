@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Stack;
 
 /**
@@ -120,5 +121,42 @@ public class DBUtil {
             PreparedStatement pstmt = createPreparedStatement(conn, sql, params);
             rs = pstmt.executeQuery();
         }
+    }
+
+    private int executeBatchWithNewConn (String sql, Object[][] params) throws Exception {
+        try {
+            pstmt = getConnection().prepareStatement(sql);
+            return batchTasks(params, pstmt);
+        } finally {
+            closeAll();
+        }
+    }
+
+    public int executeBacth (String sql, Object[][] params) throws Exception {
+        int count = -1;
+        long threadId = Thread.currentThread().getId();
+        if (ConnectionControle.threadId2Connections.getOrDefault(threadId, new Stack<>()).isEmpty()) {    // 没有缓存的conn，说明要重新开一个conn
+            return executeBatchWithNewConn(sql, params);
+        } else {
+            // conn 不关闭
+            Connection conn = ConnectionControle.threadId2Connections.get(threadId).peek();
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            count = batchTasks(params, pstmt);
+            pstmt.close();
+            return count;
+        }
+    }
+
+    private int batchTasks(Object[][] params, PreparedStatement pstmt) throws SQLException {
+        for (Object[] param : params) {
+            if (param != null) {
+                for (int i = 1; i <= param.length; i++) {
+                    pstmt.setObject(i, param[i - 1]);
+                }
+                pstmt.addBatch();
+            }
+        }
+        int[] batch = pstmt.executeBatch();
+        return batch.length;
     }
 }

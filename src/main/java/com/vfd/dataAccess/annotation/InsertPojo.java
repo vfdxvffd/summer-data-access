@@ -9,6 +9,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface InsertPojo {
     String sql();
-    boolean mutiply();
+    boolean mutiply() default false;
     Class<?> pojo();
 }

@@ -39,12 +39,46 @@ public class ProxyFactory {
         return Proxy.newProxyInstance(interfacee.getClassLoader(), new Class[]{interfacee},
                 (proxy, method, args) -> {
                     DBUtil dbUtil = new DBUtil();
-
                     String sql = "";
-                    sql = method.getAnnotation(Insert.class) == null ? "" : method.getAnnotation(Insert.class).sql();
+                    boolean isBoolean = boolean.class.equals(method.getReturnType()) || Boolean.class.equals(method.getReturnType());
+
+                    Insert insert = method.getAnnotation(Insert.class);
+                    sql = insert == null ? "" : insert.sql();
+                    if (!"".equals(sql)) {
+                        if (isBoolean) {
+                            int row = insert.mutiply() ? dbUtil.executeBacth(sql, (Object[][]) args[0]) : dbUtil.executeUpdate(sql, args);
+                            return row > 0;
+                        }
+                        return insert.mutiply() ? dbUtil.executeBacth(sql, (Object[][]) args[0]) : dbUtil.executeUpdate(sql, args);
+                    }
+
+                    InsertPojo insertPojo = method.getAnnotation(InsertPojo.class);
+                    sql = insertPojo.sql();
+                    if (!"".equals(sql)) {
+                        String[] fields = sql.substring(sql.indexOf("(") + 1, sql.indexOf(")")).replaceAll(" ", "").split(",");
+                        Object[][] pojosByArgs = getPojosByArgs(args, insertPojo.pojo(), insertPojo.mutiply(), fields);
+                        if (insertPojo.mutiply()) {
+                            if (isBoolean) {
+                                int row = dbUtil.executeBacth(sql, pojosByArgs);
+                                return row > 0;
+                            }
+                            return dbUtil.executeBacth(sql, pojosByArgs);
+                        } else {
+                            if (isBoolean) {
+                                int row = dbUtil.executeUpdate(sql, pojosByArgs[0]);
+                                return row > 0;
+                            }
+                            return dbUtil.executeUpdate(sql, pojosByArgs[0]);
+                        }
+                    }
+
                     sql = method.getAnnotation(Delete.class) == null ? sql : method.getAnnotation(Delete.class).sql();
                     sql = method.getAnnotation(Update.class) == null ? sql : method.getAnnotation(Update.class).sql();
                     if (!"".equals(sql)) {
+                        if (isBoolean) {
+                            int row = dbUtil.executeUpdate(sql, args);
+                            return row > 0;
+                        }
                         return dbUtil.executeUpdate(sql, args);
                     }
 
@@ -69,7 +103,8 @@ public class ProxyFactory {
                         return getSelectPojo(dbUtil, selectPojo.pojo(), method);
                     }
 
-                    boolean isSqlMethod = method.getAnnotation(Insert.class) != null
+                    boolean isSqlMethod = insert != null
+                            || insertPojo != null
                             || method.getAnnotation(Delete.class) != null
                             || method.getAnnotation(Update.class) != null
                             || select != null || selectMaps != null || selectPojo != null;
@@ -160,7 +195,7 @@ public class ProxyFactory {
         }
     }
 
-    private Object getPojoInstance(Class<?> pojo, ResultSet rs) throws InstantiationException, IllegalAccessException {
+    private Object getPojoInstance (Class<?> pojo, ResultSet rs) throws InstantiationException, IllegalAccessException {
         Object instance = pojo.newInstance();
         for (Field field : pojo.getDeclaredFields()) {
             field.setAccessible(true);
@@ -175,5 +210,46 @@ public class ProxyFactory {
             field.set(instance, object);
         }
         return instance;
+    }
+
+    private Object[][] getPojosByArgs (Object[] args, Class<?> pojo, boolean mutiply, String[] fields) throws Exception {
+
+        Field[] declaredFields = pojo.getDeclaredFields();
+        Map<String, String> mappings = new HashMap<>(declaredFields.length);
+        for (Field field : declaredFields) {
+            Mapping mapping = field.getAnnotation(Mapping.class);
+            if (mapping != null) {
+                mappings.put(mapping.from(), field.getName());
+            }
+        }
+
+        Object[][] result = new Object[fields.length][mutiply ? ((Object[])args[0]).length : 1];
+        if (mutiply) {
+            Object[] pojos = (Object[]) args[0];
+            int i = 0;
+            for (Object o : pojos) {
+                result[i++] = getRowData(pojo, fields, mappings, o);;
+            }
+        } else {
+            Object o = args[0];
+            result[0] = getRowData(pojo, fields, mappings, o);
+        }
+        return result;
+    }
+
+    private Object[] getRowData (Class<?> pojo, String[] fields, Map<String, String> mappings, Object o) throws Exception {
+        Object[] row = new Object[fields.length];
+        int j = 0;
+        for (String field : fields) {
+            String fieldName = mappings.get(field);
+            if (fieldName == null) {
+                throw new Exception("pojo未映射的字段: " + field);
+            }
+            Field pojoField = pojo.getDeclaredField(fieldName);
+            pojoField.setAccessible(true);
+            Object value = pojoField.get(o);
+            row[j++] = value;
+        }
+        return row;
     }
 }
