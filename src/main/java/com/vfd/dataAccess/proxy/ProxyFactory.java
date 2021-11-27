@@ -137,7 +137,7 @@ public class ProxyFactory {
     public <T> Object getSelectResult (Method method, DBUtil dbUtil, Class<?> resultType) throws Exception {
         ResultSet rs = dbUtil.rs;
         String columnName = rs.getMetaData().getColumnName(1);
-        if (List.class.equals(method.getReturnType())) {            // 如果返回值是以List接收的
+        if (List.class.isAssignableFrom(method.getReturnType())) {            // 如果返回值是以List接收的
             List<T> result = new ArrayList<>();
             while (rs.next()) {
                 result.add((T) rs.getObject(columnName, resultType));
@@ -176,7 +176,7 @@ public class ProxyFactory {
     @SuppressWarnings("all")
     public <T> Object getSelectPojo (DBUtil dbUtil, Class<?> pojo, Method method) throws Exception {
         ResultSet rs = dbUtil.rs;
-        if (List.class.equals(method.getReturnType())) {
+        if (List.class.isAssignableFrom(method.getReturnType())) {
             List<T> result = new ArrayList<>();
             while (rs.next()) {
                 result.add((T) getPojoInstance(pojo, rs));
@@ -223,7 +223,7 @@ public class ProxyFactory {
             }
         }
 
-        Object[][] result = new Object[fields.length][mutiply ? ((Object[])args[0]).length : 1];
+        Object[][] result = new Object[mutiply ? ((Object[])args[0]).length : 1][fields.length];
         if (mutiply) {
             Object[] pojos = (Object[]) args[0];
             int i = 0;
