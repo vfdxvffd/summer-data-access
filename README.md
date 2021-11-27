@@ -1,18 +1,18 @@
 # summer-data-access
 
+[![](https://img.shields.io/badge/pre--release-v0.1-red)](https://github.com/vfdxvffd/summer-data-access/releases/tag/v0.1)
+
 > ​		summer-data-access，适配到summer的数据访问模块，旨在可以通过注解快速的解决数据库访问的问题，采用`druid`数据源做连接池可以支持配置化的修改连接池相关配置。在`0.1-PRE-RELEASE`版本中做了`mysql`相关的处理以及事务的相关处理，可以使用注解更加方便的配置事务，后面会根据需要慢慢加入更多的数据库。
 
 
 
 ## 版本适配
 
-| summer | summer-data-access |
-| ------ | ------------------ |
-| 1.2    | 0.1                |
+| summer                                                       | summer-data-access                                           |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [![](https://img.shields.io/badge/Release-v1.2-important)](https://github.com/vfdxvffd/Summer/releases/tag/v1.2) | [![](https://img.shields.io/badge/pre--release-v0.1-red)](https://github.com/vfdxvffd/summer-data-access/releases/tag/v0.1) |
 
 ## 快速开始(Quick Start)
-
-
 
 ### 加入依赖
 
@@ -56,7 +56,7 @@ summer.datasource.druid.maxWait=3000
 
 ​		对于事务，通过`@Transaction`注解来使用，通常在某个service的方法里调用了多条mapper里执行sql语句的方法，若要使这些sql语句在一个事务里执行，只需要在对应的service的方法上标注`@Transaction`注解。
 
-​		若一个service方法调用了其他service的事物方法，之就表示可能会有事务的嵌套结构出现，可以通过指定`@Transaction`注解中的参数`withAnotherConn = true or false`来表示是开启一个新的事务连接来执行还是沿用父事务的连接来执行。
+​		若一个service方法调用了其他service的事物方法，之就表示可能会有事务的嵌套结构出现，可以通过指定`@Transaction`注解中的参数`withAnotherConn = true or false`来表示是开启一个新的事务连接来执行还是沿用父事务的连接来执行，如果在一个service里的事务方法需要调用另一个事务方法，且需要开启一个新的连接，则需要在service中注入本身service对象再调用。
 
 
 
